@@ -1,0 +1,31 @@
+{
+  "name": "totem-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "worker.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "colors": "^1.1.2",
+    "htmlencode": "0.0.4",
+    "mysql": "^2.8.0",
+    "request": "^2.60.0",
+    "retry": "^0.8.0",
+    "websocket": "^1.0.21"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/williamtdr/totem-server.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/williamtdr/totem-server/issues"
+  },
+  "homepage": "https://github.com/williamtdr/totem-server#readme"
+}
