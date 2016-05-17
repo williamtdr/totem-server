@@ -1,20 +1,18 @@
 {
   "name": "totem-server",
-  "version": "1.0.0",
-  "description": "",
-  "main": "worker.js",
-  "directories": {
-    "test": "test"
-  },
+  "version": "2.0.0",
+  "description": "Websocket server to host rooms for totem.fm",
+  "main": "app.js",
   "dependencies": {
     "colors": "^1.1.2",
     "htmlencode": "0.0.4",
+    "lodash.get": "^4.3.0",
+    "lodash.set": "^4.2.0",
     "mysql": "^2.8.0",
     "request": "^2.60.0",
-    "retry": "^0.8.0",
+    "retry": "^0.9.0",
     "websocket": "^1.0.21"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -22,10 +20,10 @@
     "type": "git",
     "url": "git+https://github.com/williamtdr/totem-server.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "williamtdr",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/williamtdr/totem-server/issues"
   },
-  "homepage": "https://github.com/williamtdr/totem-server#readme"
+  "homepage": "http://totem.fm"
 }

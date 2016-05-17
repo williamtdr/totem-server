@@ -1,0 +1,11 @@
+{
+	"api_url": "http://api.totem.fm",
+	"database": {
+		"host": "127.0.0.1",
+		"port": 3306,
+		"user": "totem",
+		"password": "password",
+		"database": "totem"
+	},
+	"port": 10000
+}
