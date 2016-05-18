@@ -1,20 +1,23 @@
 "use strict";
 
-var Song = require("./Song.js"),
-	Score = require("./Score.js"),
+var Song = require("./Song"),
+	Score = require("./Score"),
+	UserManager = require("../UserManager"),
+	permission = require("../PermissionManager"),
+	database = require("../database"),
 	htmlencode = require('htmlencode');
 
 module.exports = class Room {
-	constructor(id, display_name) {
+	constructor(id, name) {
 		this.id = id;
-		this.display_name = display_name;
+		this.name = name;
 		this.description = "";
 		this.song = false;
 		this.score = new Score();
 		this.current_dj = "";
 
 		this.chat_history = [];
-		this.listeners_by_name = [];
+		this.listenerNames = [];
 		this.backgrounds = false;
 		this.listener_count = 0;
 		this.icon = "http://static.totem.fm/default_notification.png";
@@ -36,17 +39,107 @@ module.exports = class Room {
 	encode() {
 		return {
 			id: this.id,
-			display_name: this.display_name,
+			display_name: this.name,
 			description: this.description,
 			song: this.song,
 			score: this.score,
 			current_dj: this.current_dj,
 			chat_history: this.chat_history,
-			listeners_by_name: this.listeners_by_name,
+			listeners_by_name: this.listenerNames,
 			backgrounds: this.backgrounds,
 			listener_count: this.listener_count,
 			icon: this.icon
 		};
+	}
+
+	add(user) {
+		UserManager.users[user.key].room = this.id;
+
+		if(permission.awaiting_permission_load[this.id])
+			permission.awaiting_permission_load[this.id].push({connection: user.connection, id: user.id});
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_ROOM_QUEUE_BANNED))
+			user.send({
+				event: "permission", data: {type: "queue_ban_room"}
+			});
+
+		if(permission.getEffectivePermissionLevel(user.id, this.id) <= permission.EFFECTIVE_PERMISSION_LEVEL_ADMIN) {
+			user.sendChatMessage("", '<span style="color: #2ECC71">Welcome! You have admin privileges in this room, check /help for a list of commands.</span>');
+			user.send({
+				event: "permission", data: {type: "room_admin"}
+			});
+		}
+
+		if(permission.getEffectivePermissionLevel(user.id, this.id) === permission.EFFECTIVE_PERMISSION_LEVEL_HOST) {
+			user.sendChatMessage("", '<span style="color: #2ECC71">Welcome! You have admin privileges in this room, check /help for a list of commands.</span>');
+			user.send({
+				event: "permission", data: {type: "room_host"}
+			});
+		}
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_SITE_QUEUE_BANNED))
+			user.send({
+				event: "permission", data: {type: "queue_ban_site"}
+			});
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_ROOM_MUTED))
+			user.send({
+				event: "permission", data: {type: "muted_room"}
+			});
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_SITE_MUTED))
+			user.send({
+				event: "permission", data: {type: "muted_site"}
+			});
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_SITE_BANNED))
+			return user.send({
+				event: "permission", data: {type: "banned_site"}
+			});
+
+		if(permission.checkPermission(user.id, this.id, permission.PERMISSION_LEVEL_ROOM_BANNED))
+			return user.send({
+				event: "permission", data: {type: "banned_room"}
+			});
+
+		this.listeners.push(user.key);
+		this.listenerNames.push(user.name);
+		this.listener_count++;
+		this.updateUserCounter();
+		this.updateUserList();
+
+		if(this.password)
+			user.send({
+				"event": "requires_authentication",
+				"display_name": this.name
+			});
+		else user.send({
+			event: "room_data",
+			data: this.encode(),
+			room: this.id
+		});
+		this.sendChatMessage(">", "<span style=\"color:#BDC3C7\">" + user.name + " joined the room</span>", false, true, "#3498DB", "#2980B9");
+
+		var tmp_queue = [];
+		for(var index in this.queue[user.id])  {
+			var data = this.queue[user.id][index];
+
+			tmp_queue.push({
+				name: data.name,
+				artist: data.artist,
+				id: data.id,
+				thumbnail: data.thumbnail,
+				duration: data.duration,
+				dj: data.dj
+			});
+		}
+
+		if(tmp_queue.length > 0) user.send({
+			event: "queue_update",
+			data: tmp_queue
+		});
+
+		console.log("[User] ".yellow + (user.name + " connected to " + this.id + ".").white);
 	}
 
 	removeUserFromQueue(id) {
@@ -55,43 +148,46 @@ module.exports = class Room {
 	}
 
 	updateUserList() {
-		for(var listener of this.listeners)
-			listener.send(JSON.stringify({
-				event: "user_list_change",
-				data: this.listeners_by_name
-			}));
+		this.broadcast({
+			event: "user_list_change",
+			data: this.listenerNames
+		});
 	}
 
 	getOrderedQueue(append_id) {
+		append_id = append_id || false;
+
 		var queue_data = [],
 			everyones_next_items = [];
-
-		append_id = append_id || false;
 
 		for(var user_id in this.queue) {
 			var local_lowest_started_at = Number.MAX_VALUE,
 				lowest_index = 0;
 
-			if(this.queue[user_id].length === 0) {
+			if(this.queue[user_id].length == 0) {
 				delete this.queue[user_id];
 				break;
 			}
 
-			for(var data of this.queue[user_id])
+			for(var data_index in this.queue[user_id]) {
+				var data = this.queue[user_id][data_index];
 				if(data.added_at < local_lowest_started_at) {
 					local_lowest_started_at = data.added_at;
 					lowest_index = data_index;
 				}
+			}
 
 			everyones_next_items[local_lowest_started_at] = this.queue[user_id][lowest_index];
 		}
+
+		console.log(everyones_next_items);
 
 		var keys = Object.keys(everyones_next_items),
 			i, len = keys.length;
 
 		keys.sort();
 
-		for(i = 0; i < len; i++) {
+		for (i = 0; i < len; i++) {
 			var k = keys[i],
 				item = everyones_next_items[k];
 
@@ -103,17 +199,18 @@ module.exports = class Room {
 				s.picture_url = item.thumbnail;
 				s.duration = item.duration;
 
-				if(append_id)
+				if(append_id) {
 					queue_data.push({
 						song: s,
 						dj: item.dj,
 						id: item.dj_id
 					});
-				else
+				} else {
 					queue_data.push({
 						song: s,
 						dj: item.dj
 					});
+				}
 			}
 		}
 
@@ -121,14 +218,11 @@ module.exports = class Room {
 	}
 
 	updateUserCounter() {
-		global.db.connection.query("UPDATE `rooms` SET `user_counter`=" + global.db.connection.escape(this.listener_count) + " WHERE `id`=" + global.db.connection.escape(this.id));
-		for(var listener of this.listeners)
-			listener.send(JSON.stringify({
-				event: "user_counter_update",
-				data: this.listener_count
-			}));
-
-		this.updateRoomJson();
+		database.connection.query("UPDATE `rooms` SET `user_counter` = " + database.connection.escape(this.listener_count) + " WHERE `id` = " + database.connection.escape(this.id));
+		this.broadcast({
+			event: "user_counter_update",
+			data: this.listener_count
+		});
 	}
 
 	checkScore() {
@@ -173,11 +267,12 @@ module.exports = class Room {
 	updateQueueList() {
 		var data = this.getOrderedQueue();
 
-		for(var listener of this.listeners)
-			listener.send(JSON.stringify({
-				event: "queue_change",
-				data: data
-			}));
+		console.log(data);
+
+		this.broadcast({
+			event: "queue_change",
+			data: data
+		});
 
 		if(!data || data.length === 0)
 			this.queue = [];
@@ -186,7 +281,9 @@ module.exports = class Room {
 	}
 
 	// Remove a user's vote when they leave a room
-	removeVote(listener_id) {
+	removeVote(user) {
+		var listener_id = user.key;
+
 		if(this.vote_log[listener_id] === undefined)
 			return false;
 
@@ -208,26 +305,22 @@ module.exports = class Room {
 			this.song = ordered_queue[0].song;
 			this.current_dj = ordered_queue[0].dj;
 
-			for(var listener of this.listeners)
-				if(listener != undefined)
-					listener.send(JSON.stringify({
-						event: "song_change",
-						data: {
-							song: this.song,
-							dj: this.current_dj
-						},
-						room: this.id
-					}));
+			this.broadcast({
+				event: "song_change",
+				data: {
+					song: this.song,
+					dj: this.current_dj
+				},
+				room: this.id
+			});
 
 			console.log("[Song] ".green + (this.current_dj).white + (' is playing ').gray + (this.song.artist).white + ' - '.gray + (this.song.name).white);
 
-			global.db.connection.query("UPDATE `rooms` SET `song_name`='" + this.song.name + "',`song_artist`='" + this.song.artist + "',`song_started_at`='" + this.song.started_at + "',`song_url_fragment`='" + this.song.url_fragment + "',`song_source`='" + this.song.source + "',`song_picture_url`='" + this.song.picture_url + "' WHERE `id`='" + this.id + "'");
+			database.connection.query("UPDATE `rooms` SET `song_name`='" + this.song.name + "',`song_artist`='" + this.song.artist + "',`song_started_at`='" + this.song.started_at + "',`song_url_fragment`='" + this.song.url_fragment + "',`song_source`='" + this.song.source + "',`song_picture_url`='" + this.song.picture_url + "' WHERE `id`='" + this.id + "'");
 
 			this.next_queue_advance = Math.floor(Date.now() / 1000) + (parseInt(ordered_queue[0].song.duration) - 3);
 			this.score.positive = 0;
 			this.score.negative = 0;
-
-			this.updateRoomJson();
 
 			this.vote_log = [];
 			this.removeSongFromQueue(ordered_queue[0].id, ordered_queue[0].song.url_fragment);
@@ -236,15 +329,14 @@ module.exports = class Room {
 		} else {
 			this.queue = [];
 			this.song = false;
-			this.updateRoomJson();
 			this.next_queue_advance = Number.MAX_VALUE;
 
-			global.db.connection.query("UPDATE `rooms` SET `song_name`=null,`song_artist`=null,`song_started_at`=0,`song_url_fragment`=null,`song_source`=null,`song_picture_url`=null WHERE `id`='" + this.id + "'");
+			database.connection.query("UPDATE `rooms` SET `song_name`=null,`song_artist`=null,`song_started_at`=0,`song_url_fragment`=null,`song_source`=null,`song_picture_url`=null WHERE `id`='" + this.id + "'");
 		}
 	}
 
 	syncBackgrounds() {
-		global.db.connection.query('SELECT `url` FROM `backgrounds` WHERE `scope` = \'' + this.id + '\'', (err, rows) => {
+		database.connection.query('SELECT `url` FROM `backgrounds` WHERE `scope` = \'' + this.id + '\'', (err, rows) => {
 			if(rows.length > 0) {
 				this.backgrounds = [];
 
@@ -253,34 +345,31 @@ module.exports = class Room {
 			} else
 				this.backgrounds = [];
 
-			for(var listener of this.listeners)
-				listener.send(JSON.stringify({
-					event: "backgrounds",
-					data: this.backgrounds
-				}));
+			this.broadcast({
+				event: "backgrounds",
+				data: this.backgrounds
+			});
 		});
 	}
 
 	sendNotification(text, type) {
-		for(var listener of this.listeners)
-			listener.send(JSON.stringify({
-				event: "notification",
-				data: {
-					text: text,
-					type: type
-				}
-			}));
+		this.broadcast({
+			event: "notification",
+			data: {
+				text: text,
+				type: type
+			}
+		});
 	}
 
 	sendScore() {
-		for(var listener of this.listeners)
-			listener.send(JSON.stringify({
-				event: "score_update",
-				data: {
-					positive: this.score.positive,
-					negative: this.score.negative
-				}
-			}));
+		this.broadcast({
+			event: "score_update",
+			data: {
+				positive: this.score.positive,
+				negative: this.score.negative
+			}
+		});
 	}
 
 	sendSystemMessage(message) {
@@ -320,18 +409,24 @@ module.exports = class Room {
 		};
 
 		if(formatted) data.data.formatted = true;
-		data = JSON.stringify(data);
 
-		for(var listener of this.listeners)
-			listener.send(data);
+		this.broadcast(data);
 	}
 
-	updateRoomJson() {
-		this.room_data_json = JSON.stringify({
-			event: "room_data",
-			data: this.encode(),
-			room: this.id
-		});
+	broadcast(message) {
+		for(var listener_key in this.listeners) {
+			var listener = this.listeners[listener_key];
+
+			UserManager.getByKey(listener).send(message);
+		}
+	}
+
+	iterate(cb) {
+		for(var listener_key in this.listeners) {
+			var listener = this.listeners[listener_key];
+
+			cb(UserManager.getByKey(listener));
+		}
 	}
 
 	tick() {

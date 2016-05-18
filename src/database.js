@@ -26,7 +26,7 @@ var retryConnection = (initial, cb) => {
     console.log("[System] ".blue + "Connecting to MySQL server...".white);
 
     var operation = retry.operation();
-    operation.attempt(function (currentAttempt) {
+    operation.attempt(function(currentAttempt) {
         dbConnection = false;
         createConnection((err1) => {
             if(err1) {
@@ -39,8 +39,9 @@ var retryConnection = (initial, cb) => {
                 if(!initial)
 					console.log("[System] ".blue + ("Database reconnected.").white);
 
-            if(cb)
-				cb(err1 ? operation.mainError() : null, dbConnection);
+			module.exports.connection = dbConnection;
+
+            cb();
         });
     });
 };

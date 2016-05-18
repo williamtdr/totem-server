@@ -14,14 +14,26 @@ module.exports = {
 
 		return text;
 	},
-	removeA: (arr) => {
-		var what, a = arguments, L = a.length, ax;
-		while (L > 1 && arr.length) {
-			what = a[--L];
-			while ((ax = arr.indexOf(what)) !== -1) {
-				arr.splice(ax, 1);
+	removeEl: (array, what) => {
+		var index = array.indexOf(what);
+
+		if(index > -1)
+			array.splice(index, 1);
+	},
+	getNextAddedAt: (data) => {
+		var highest_added_at = 0;
+
+		if(data.length > 0) {
+			for(var index in data) {
+				var item = data[index],
+					time = (item.added_at + item.duration);
+
+				if(time > highest_added_at)
+					highest_added_at = time;
 			}
-		}
-		return arr;
+
+			return highest_added_at;
+		} else
+			return Math.floor(Date.now() / 1000);
 	}
 };

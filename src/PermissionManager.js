@@ -4,7 +4,7 @@ module.exports.PERMISSION_LEVEL_ROOM_HOST = 2;
 module.exports.PERMISSION_LEVEL_ROOM_MUTED = 3;
 module.exports.PERMISSION_LEVEL_ROOM_QUEUE_BANNED = 4;
 module.exports.PERMISSION_LEVEL_ROOM_BANNED = 5;
-
+ 
 module.exports.PERMISSION_LEVEL_SITE_ADMIN = 6;
 module.exports.PERMISSION_LEVEL_SITE_MUTED = 7;
 module.exports.PERMISSION_LEVEL_SITE_QUEUE_BANNED = 8;
@@ -21,14 +21,16 @@ module.exports.EFFECTIVE_PERMISSION_LEVEL_NORMAL = 6;
 permissions = [];
 exports.awaiting_permission_load = {};
 
-exports.reload = function(room_id, targets) {
-	console.log("Reloading permission table for " + room_id + "...");
+var database = require("./database");
+
+exports.reload = (room_id, targets) => {
+	console.log("[Permission] ".red + ("Reloading permission table for " + room_id + "...").white);
 	for(var user_id in permissions)
 		for(var index in permissions[user_id])
 			if(permissions[user_id][index].scope === room_id.toLowerCase)
 				delete permissions[user_id][index];
 
-	db.connection.query('SELECT * FROM `permissions` WHERE `scope`=\'' + room_id.toLowerCase() + '\'', function(err, rows) {
+	database.connection.query('SELECT * FROM `permissions` WHERE `scope`=\'' + room_id.toLowerCase() + '\'', function(err, rows) {
 		for(var row of rows) {
 			if(!permissions[row.id])
 				permissions[row.id] = [];
@@ -107,12 +109,12 @@ exports.addPermission = function(key, permission) {
 		permissions[key] = [];
 
 	permissions[key].push(permission);
-	db.connection.query('INSERT IGNORE INTO `permissions` (`id`, `scope`, `level`) VALUES ("' + key + '", "' + permission.scope.toLowerCase() + '", "' + permission.level + '")');
+	database.connection.query('INSERT IGNORE INTO `permissions` (`id`, `scope`, `level`) VALUES ("' + key + '", "' + permission.scope.toLowerCase() + '", "' + permission.level + '")');
 };
 
 exports.removePermission = function(key, permission) {
 	permissions[key] = [];
-	db.connection.query("DELETE FROM `permissions` WHERE `id`='" + key + "' AND `scope`='" + permission.scope.toLowerCase() + "'");
+	database.connection.query("DELETE FROM `permissions` WHERE `id`='" + key + "' AND `scope`='" + permission.scope.toLowerCase() + "'");
 };
 
 exports.getPermissions = function(key, scope) {
@@ -139,6 +141,8 @@ exports.checkPermission = function(id, scope, permission) {
 
 exports.getEffectivePermissionLevel = function(id, scope) {
 	if(!scope)
+		return this.EFFECTIVE_PERMISSION_LEVEL_NORMAL;
+	if(id === -1)
 		return this.EFFECTIVE_PERMISSION_LEVEL_NORMAL;
 
 	var room_permissions = this.getPermissions(id, scope.toLowerCase()),
