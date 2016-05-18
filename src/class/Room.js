@@ -158,7 +158,7 @@ module.exports = class Room {
 		append_id = append_id || false;
 
 		var queue_data = [],
-			everyones_next_items = [];
+			everyones_next_items = {};
 
 		for(var user_id in this.queue) {
 			var local_lowest_started_at = Number.MAX_VALUE,
@@ -171,46 +171,43 @@ module.exports = class Room {
 
 			for(var data_index in this.queue[user_id]) {
 				var data = this.queue[user_id][data_index];
+
 				if(data.added_at < local_lowest_started_at) {
 					local_lowest_started_at = data.added_at;
 					lowest_index = data_index;
 				}
 			}
 
-			everyones_next_items[local_lowest_started_at] = this.queue[user_id][lowest_index];
+			if(local_lowest_started_at !== Number.MAX_VALUE) everyones_next_items[local_lowest_started_at] = this.queue[user_id][lowest_index];
 		}
 
-		console.log(everyones_next_items);
-
 		var keys = Object.keys(everyones_next_items),
-			i, len = keys.length;
+			i;
 
 		keys.sort();
 
-		for (i = 0; i < len; i++) {
+		for(i = 0; i < keys.length; i++) {
 			var k = keys[i],
 				item = everyones_next_items[k];
 
-			if(k != Number.MAX_VALUE) {
-				var s = new Song();
-				s.name = item.name;
-				s.artist = item.artist;
-				s.url_fragment = item.id;
-				s.picture_url = item.thumbnail;
-				s.duration = item.duration;
+			var s = new Song();
+			s.name = item.name;
+			s.artist = item.artist;
+			s.url_fragment = item.id;
+			s.picture_url = item.thumbnail;
+			s.duration = item.duration;
 
-				if(append_id) {
-					queue_data.push({
-						song: s,
-						dj: item.dj,
-						id: item.dj_id
-					});
-				} else {
-					queue_data.push({
-						song: s,
-						dj: item.dj
-					});
-				}
+			if(append_id) {
+				queue_data.push({
+					song: s,
+					dj: item.dj,
+					id: item.dj_id
+				});
+			} else {
+				queue_data.push({
+					song: s,
+					dj: item.dj
+				});
 			}
 		}
 
@@ -267,17 +264,13 @@ module.exports = class Room {
 	updateQueueList() {
 		var data = this.getOrderedQueue();
 
-		console.log(data);
+		if(!data || data.length === 0)
+			this.queue = [];
 
 		this.broadcast({
 			event: "queue_change",
 			data: data
 		});
-
-		if(!data || data.length === 0)
-			this.queue = [];
-		else
-			this.queue = data;
 	}
 
 	// Remove a user's vote when they leave a room

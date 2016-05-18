@@ -349,7 +349,9 @@ module.exports = (room, user, data) => {
 
 									console.log("[Queue] ".magenta + (user.name + " added " + dataParsed.artist + " - " + dataParsed.name + " to " + room.id + "'s queue").white);
 
-									if(!room.queue[user.id]) room.queue[user.id] = [];
+									if(!room.queue[user.id])
+										room.queue[user.id] = [];
+
 									room.queue[user.id].push({
 										name: dataParsed.name,
 										artist: dataParsed.artist,
