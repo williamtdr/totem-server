@@ -89,6 +89,7 @@ module.exports = {
 
 				if(currentRoom) {
 					console.log("[User] ".yellow + (user.name + " from " + user.room + " disconnected.").white);
+					currentRoom.sendChatMessage(">", "<span style=\"color:#BDC3C7\">" + user.name + " left the room</span>", false, true, "#3498DB", "#2980B9");
 					UserManager.users[user.key].room = false;
 
 					utils.removeEl(currentRoom.listeners, user.key);

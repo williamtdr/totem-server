@@ -194,7 +194,7 @@ module.exports = (room, user, data) => {
 					for(var queueIndex in room.queue[user.id]) {
 						var queueData = room.queue[user.id][queueIndex];
 
-						if(queueData.id === song_id) {
+						if(queueData.id === songId) {
 							delete data.data[queueIndex];
 							failed++;
 						}
@@ -512,6 +512,5 @@ module.exports = (room, user, data) => {
 	} catch(e) {
 		console.log("Internal exception when processing user message:");
 		console.log(e);
-		console.log(data);
 	}
 };

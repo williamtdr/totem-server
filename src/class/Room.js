@@ -311,7 +311,7 @@ module.exports = class Room {
 
 			database.connection.query("UPDATE `rooms` SET `song_name`='" + this.song.name + "',`song_artist`='" + this.song.artist + "',`song_started_at`='" + this.song.started_at + "',`song_url_fragment`='" + this.song.url_fragment + "',`song_source`='" + this.song.source + "',`song_picture_url`='" + this.song.picture_url + "' WHERE `id`='" + this.id + "'");
 
-			this.next_queue_advance = Math.floor(Date.now() / 1000) + (parseInt(ordered_queue[0].song.duration) - 3);
+			this.next_queue_advance = Math.floor(Date.now() / 1000) + (parseInt(ordered_queue[0].song.duration) - 1);
 			this.score.positive = 0;
 			this.score.negative = 0;
 
