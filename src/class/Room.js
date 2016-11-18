@@ -4,8 +4,7 @@ var Song = require("./Song"),
 	Score = require("./Score"),
 	UserManager = require("../UserManager"),
 	permission = require("../PermissionManager"),
-	database = require("../database"),
-	htmlencode = require('htmlencode');
+	database = require("../database");
 
 module.exports = class Room {
 	constructor(id, name) {
@@ -378,14 +377,11 @@ module.exports = class Room {
 
 		if(log) {
 			this.chat_counter++;
-			var new_message = message;
-			if(!(sender === "" || sender === ">")) new_message = htmlencode.htmlEncode(message);
-
 			this.chat_history.push({
-				sender: sender,
-				message: new_message,
-				color: color,
-				hover_color: hover_color
+				sender,
+				message,
+				color,
+				hover_color
 			});
 
 			if(this.chat_counter > 20) this.chat_history.splice();
